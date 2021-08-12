@@ -1,0 +1,106 @@
+var express = require('express');
+var app = express();
+var https = require('https');
+const fs = require('fs');
+const ejs = require('ejs');
+bodyParser = require('body-parser')
+app.set('port', process.env.PORT | 3000);
+
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
+var parseForm = bodyParser.urlencoded({ extended: false })
+
+const fbUpload = require('facebook-api-video-upload');
+const bt = {
+  token: "", // with the permission to upload
+  //id: "954602734914669", //The id represent {page_id || group_id}
+  id:"",
+  //stream: fs.createReadStream(''), //path to the video,
+  stream : '',
+  title: "", // Title of Video
+  description: "" // Description of video
+  
+};
+
+// Set EJS as templating engine 
+app.set('view engine', 'ejs'); 
+app.get('/', function(req, res){
+  res.render('home'); 
+});
+
+
+// const readline = require('readline').createInterface({
+//     input: process.stdin,
+//     output: process.stdout
+// });
+
+// readline.question('Please enter the access token : ', (accesstoken) => {
+//     readline.question('Please enter the path of the XML file : ', (path) => {
+//         bt.token = accesstoken;
+//          videoUploaded(path);
+//          readline.close();
+//     });
+// });
+
+app.post('/login',parseForm, function(req, res){
+  //console.log(JSON.stringify(req.body));
+  bt.token = req.body.accesstoken;
+  var output = videoUploaded(req.body.filepath);
+  res.render('home',{response:'completed'});
+
+});
+
+
+
+const excelToJson = require('convert-excel-to-json');
+
+    
+  let videoUploaded = async (val) => {
+    const result = excelToJson({
+      sourceFile: val,
+      sheets: ['Sheet1'],
+      columnToKey: {
+        'A': '{{A1}}',
+        'B': '{{B1}}',
+        'C': '{{C1}}',
+        'D': '{{D1}}',
+      }
+    });
+    let data = result.Sheet1;
+    for(let index = 1; index < data.length; index++){
+      console.log(index);
+      bt.id= data[index].id;
+      bt.title = data[index].title;
+      bt.description=data[index].description;
+      bt.stream = fs.createReadStream(data[index].path);
+      let response = await abcd(bt,index);
+      response.index= index;
+      response.title = data[index].title;
+      bt.description=data[index].description;
+      var today = new Date();
+      var time = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
+      response.timeOfUpload = time;
+      fs.appendFileSync('C:/workplace/success.txt', JSON.stringify(response));
+      console.log(response);
+    
+    }
+    
+    
+  }
+
+
+
+async function abcd(bt,index) {
+  console.log('Uploading Videos  and index is '+index); 
+  try {
+    const res = await fbUpload(bt);
+    return res;
+  } catch (e) {
+    return e;
+  }
+}
+
+app.listen(app.get('port'), function()
+{
+console.log('Express server listening on port for running' + app.get('port'));
+});
